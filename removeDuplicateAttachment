@@ -1,0 +1,89 @@
+// @ Method 1: start()
+// @ desc: The batch of Boost__c records to be processed
+
+// @ Method 1: Execute()
+// @ desc:Processes each batch and removes duplicate ContentDocument records (attachments) associated 
+// with each Boost__c record.
+
+public class BS_RemoveDuplicateImageAttachToBill implements Database.Batchable<sObject> {
+    
+    public String query;
+    public Id singleId;
+    //parameterized Constructor
+    public BS_RemoveDuplicateImageAttachToBill(Id id) {
+    singleId = id;
+        query = 'SELECT Id FROM Boost__c where Id =:singleId';
+    }
+    //default Constructor
+    public BS_RemoveDuplicateImageAttachToBill() {
+        // It returns a QueryLocator object that contains all Ids from the Boost__c object
+        query = 'SELECT Id FROM Boost__c Order by CreatedDate Desc';
+    }
+
+    public Database.QueryLocator start(Database.BatchableContext BC) {
+        return Database.getQueryLocator(query);
+    }
+
+    public void execute(Database.BatchableContext BC, List<sObject> Boosts) {
+        try {
+            // If the batch of records is not null, it proceeds with the following operations
+            if(Boosts != Null){
+                // It creates a list of Ids from the Boost__c records in the current batch
+                List<Id> boostIds = new List<Id>();
+                for (sObject s : Boosts) {
+                    boostIds.add(s.Id);
+                }
+                
+                // It creates two maps to separate the documents that need to be kept and those that need to be deleted
+                Map<String, List<Id>> IncludeDeleteContentDoc = new Map<String, List<Id>>();
+                Map<String, Id> ExcludeDeleteContentDoc = new Map<String, Id>();
+                
+                // It iterates over the ContentDocumentLink list where LinkedEntityId is in the list of boostIds
+                for (ContentDocumentLink cdl : [SELECT ContentDocument.Title, ContentDocumentId, ContentDocument.FileType,
+                                                LinkedEntityId, LinkedEntity.Type, ContentDocument.FileExtension
+                                                FROM ContentDocumentLink WHERE LinkedEntityId IN :boostIds 
+                                                ORDER BY ContentDocument.LastModifiedDate DESC]) {
+
+                                                    String key = cdl.ContentDocument.Title + '-' + cdl.ContentDocument.FileType;
+                                                    // If the key is not in ExcludeDeleteContentDoc, it gets added there
+                                                    if (!ExcludeDeleteContentDoc.containsKey(key)) {
+                                                        ExcludeDeleteContentDoc.put(key, cdl.ContentDocumentId);
+                                                    } 
+                                                    // If the key is in ExcludeDeleteContentDoc, then it checks if it's in IncludeDeleteContentDoc
+                                                    else {
+                                                        if (IncludeDeleteContentDoc.containsKey(key)) {
+                                                            IncludeDeleteContentDoc.get(key).add(cdl.ContentDocumentId);
+                                                        } else {
+                                                            IncludeDeleteContentDoc.put(key, new List<Id>{ cdl.ContentDocumentId });
+                                                        }
+                                                    }
+                                                }
+                
+                // It creates a list of all ContentDocumentId's that need to be deleted
+                List<Id> allIds = new List<Id>();
+                for (List<Id> idList : IncludeDeleteContentDoc.values()) {
+                    allIds.addAll(idList);
+                }
+                
+                // It queries the ContentDocument records that need to be deleted
+                List<ContentDocument> docsToDelete = [SELECT Id FROM ContentDocument WHERE Id IN :allIds];
+                System.debug('Size of delete Content Doc:'+docsToDelete.size());
+                // It deletes the records
+                if (docsToDelete != null && !docsToDelete.isEmpty()) {
+                    database.delete(docsToDelete,false);
+                }
+            } 
+        }
+        catch (Exception excep) {
+            // It logs any exceptions that occur
+            System.debug('Exception message: ' + excep.getMessage());
+            System.debug('Exception cause: ' + excep.getCause());
+            System.debug('Line number: ' + excep.getLineNumber());
+        }
+        
+    }
+    
+    public void finish(Database.BatchableContext BC) {
+        // It can contain code to execute after all batches have finished
+    }
+}
