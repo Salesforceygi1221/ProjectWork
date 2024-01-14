@@ -1,0 +1,164 @@
+// @ Method 1: testRemoveDuplicateImageAttachToBillWithAllBoostRecords()
+// @ desc: This method is a test method in Salesforce that verifies the functionality of the 
+// BS_RemoveDuplicateImageAttachToBill batch class for all records
+ 
+// @ Method 1: testRemoveDuplicateImageAttachToBillWithSingleId()
+// @ desc: This method is a test method in Salesforce that verifies the functionality of the 
+// BS_RemoveDuplicateImageAttachToBill batch class for single record
+
+@isTest
+public class BS_RemoveDuplicateImageAttachToBillTest {
+    @isTest
+    public static  void testRemoveDuplicateImageAttachToBillWithAllBoostRecords() {
+        
+        // Create a new ARN_Account__c record
+        ARN_Account__c acc = new ARN_Account__c(Name = 'Test Arn Account');
+        if(acc != null){
+          insert acc;
+        }
+        
+        // Create a new ARN_Payor_Master__c record
+        ARN_Payor_Master__c apm = new ARN_Payor_Master__c(Name = 'ARNPayorMasterName');
+        if(apm != null){
+          insert apm;
+        }        
+        
+        // Create a new ARN_Payors__c record
+        ARN_Payors__c ap = new ARN_Payors__c(Name = 'ARN_Payor_Name', ARN_Payor_Master__c = apm.Id);
+        if(ap != null){
+          insert ap;
+        }
+        
+        // Create a new Boost__c record
+        Boost__c testBoost = new Boost__c(Name = 'AQW12312345', ARN_Account__c = acc.Id,  ARN_Payor__c = ap.Id );
+        if(testBoost != null){
+          insert testBoost;
+        }
+        
+        // Create a new ContentVersion record
+        ContentVersion cv = new ContentVersion();
+        cv.Title = 'Test Document';
+        cv.PathOnClient = 'TestDocument.pdf';
+        cv.VersionData = Blob.valueOf('Test Content');
+        cv.IsMajorVersion = true;
+        if(cv != null){
+          insert cv;
+        }
+        
+        // Create a duplicate ContentVersion record
+        ContentVersion cv2 = new ContentVersion();
+        cv2.Title = 'Test Document';
+        cv2.PathOnClient = 'TestDocument.pdf';
+        cv2.VersionData = Blob.valueOf('Test Content');
+        cv2.IsMajorVersion = true;
+        if(cv2 != null){
+          insert cv2;
+        }
+        
+        // Link both ContentVersions to the Boost__c record
+        List<ContentDocumentLink> links = new List<ContentDocumentLink>();
+        for (ContentVersion version : [SELECT ContentDocumentId FROM ContentVersion WHERE Id IN :new List<Id>{cv.Id, cv2.Id}]) {
+            links.add(new ContentDocumentLink(
+                ContentDocumentId = version.ContentDocumentId,
+                LinkedEntityId = testBoost.Id,
+                ShareType = 'V'
+            ));
+        }
+        if(links != null){
+          insert links;
+        }
+        
+        // Start the test context
+        Test.startTest();
+        
+        // Instantiate the batch class
+        BS_RemoveDuplicateImageAttachToBill batchInstance = new BS_RemoveDuplicateImageAttachToBill();
+        // Execute the batch job
+        Id batchJobId = Database.executeBatch(batchInstance, 200);
+        // Stop the test context
+        Test.stopTest();
+        
+        // Check that only one ContentDocumentLink remains after running the batch job
+        List<ContentDocumentLink> remainingLinks = [SELECT Id FROM ContentDocumentLink WHERE LinkedEntityId = :testBoost.Id];
+        if(remainingLinks != null){
+          System.assertEquals(1, remainingLinks.size());
+        }
+        
+    }
+
+    @IsTest
+    public static  void testRemoveDuplicateImageAttachToBillWithSingleId(){
+        // Create a new ARN_Account__c record
+        ARN_Account__c acc = new ARN_Account__c(Name = 'Test Arn Account');
+        if(acc != null){
+          insert acc;
+        }
+        
+        // Create a new ARN_Payor_Master__c record
+        ARN_Payor_Master__c apm = new ARN_Payor_Master__c(Name = 'ARNPayorMasterName');
+        if(apm != null){
+          insert apm;
+        }        
+        
+        // Create a new ARN_Payors__c record
+        ARN_Payors__c ap = new ARN_Payors__c(Name = 'ARN_Payor_Name', ARN_Payor_Master__c = apm.Id);
+        if(ap != null){
+          insert ap;
+        }
+        
+        // Create a new Boost__c record
+        Boost__c testBoost = new Boost__c(Name = 'AQW12312345', ARN_Account__c = acc.Id,  ARN_Payor__c = ap.Id );
+        if(testBoost != null){
+          insert testBoost;
+        }
+        
+        // Create a new ContentVersion record
+        ContentVersion cv = new ContentVersion();
+        cv.Title = 'Test Document';
+        cv.PathOnClient = 'TestDocument.pdf';
+        cv.VersionData = Blob.valueOf('Test Content');
+        cv.IsMajorVersion = true;
+        if(cv != null){
+          insert cv;
+        }
+        
+        // Create a duplicate ContentVersion record
+        ContentVersion cv2 = new ContentVersion();
+        cv2.Title = 'Test Document';
+        cv2.PathOnClient = 'TestDocument.pdf';
+        cv2.VersionData = Blob.valueOf('Test Content');
+        cv2.IsMajorVersion = true;
+        if(cv2 != null){
+          insert cv2;
+        }
+        
+        // Link both ContentVersions to the Boost__c record
+        List<ContentDocumentLink> links = new List<ContentDocumentLink>();
+        for (ContentVersion version : [SELECT ContentDocumentId FROM ContentVersion WHERE Id IN :new List<Id>{cv.Id, cv2.Id}]) {
+            links.add(new ContentDocumentLink(
+                ContentDocumentId = version.ContentDocumentId,
+                LinkedEntityId = testBoost.Id,
+                ShareType = 'V'
+            ));
+        }
+        if(links != null){
+          insert links;
+        }
+        
+        // Start the test context
+        Test.startTest();
+        
+        // Instantiate the batch class
+        BS_RemoveDuplicateImageAttachToBill batchInstance = new BS_RemoveDuplicateImageAttachToBill(testBoost.Id);
+        // Execute the batch job
+        Id batchJobId = Database.executeBatch(batchInstance);
+        // Stop the test context
+        Test.stopTest();
+        
+        // Check that only one ContentDocumentLink remains after running the batch job
+        List<ContentDocumentLink> remainingLinks = [SELECT Id FROM ContentDocumentLink WHERE LinkedEntityId = :testBoost.Id];
+        if(remainingLinks != null){
+          System.assertEquals(1, remainingLinks.size());
+        }
+    }
+}
